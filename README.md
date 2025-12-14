@@ -77,6 +77,14 @@ sheet music by recognizing notes, durations, and other essential musical element
 	- Multi-pitch detection / chord inference
 4. UIUX
 	- record, score editors, export to PDF, batch processing
+5. Single note recognization from STFT
+.  - trained on STFT of clear audio, with note and instrument identification
+.  
+6. note recognition in audio track
+.  - find peaks in where the note most likely is
+.  - find probable parameters for transformations of note/sound (time shift, amplitude, pitch change?)
+.  - trained on STFT of audio track, with instrument and reference midi notes
+
 
 ### Tools & Libraries Recommendations
 - Python libraries: librosa, madmom, essentia, numpy, scipy

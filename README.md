@@ -1,4 +1,6 @@
 
+![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 # Sound Pitch Recognition Methods
 
 ## Hidden Markov Model (HMM)

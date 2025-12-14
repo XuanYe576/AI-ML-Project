@@ -100,7 +100,7 @@ private:
     void openFile()
     {
         const QString fileName = QFileDialog::getOpenFileName(
-            this, "Open text file", QString(), "Text Files (*.txt *.md);;All Files (*)");
+            this, "Open text file", QString(), "Text Files (*.musicxml *.mxl *.mid *.xml *.txt *.md);;All Files (*)");
         if (fileName.isEmpty())
             return;
 
@@ -115,7 +115,7 @@ private:
     void saveFileAs()
     {
         const QString fileName = QFileDialog::getSaveFileName(
-            this, "Save text file", QString(), "Text Files (*.txt *.md);;All Files (*)");
+            this, "Save text file", QString(), "Text Files (*.musicxml *.mxl *.mid *.xml *.txt *.md);;All Files (*)");
         if (fileName.isEmpty())
             return;
 

@@ -13,6 +13,7 @@
 	- user input
 	- write out sound file
 - Next step
+	- txt2xml.py
 	- process .wav/ with YIN/ frequency method
 
 ### Fourier Transform

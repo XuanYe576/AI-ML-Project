@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 # Function to list .xml files and ask user to choose one
 def choose_xml_file():
     # Get a list of all .xml files in the current directory
-    xml_files = [f for f in os.listdir() if f.endswith('.xml')]
+    xml_files = [f for f in os.listdir() if f.endswith('.musicxml')]
     
     # Check if there are any .xml files
     if not xml_files:

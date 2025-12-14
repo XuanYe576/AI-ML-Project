@@ -1,12 +1,4 @@
-#!/usr/bin/env python3
-"""
-Placeholder ML inference script. Replace with a real model later.
-Usage: ml_model.py <path-to-audio>
-Prints a one-line summary to stdout.
-"""
-
 from __future__ import annotations
-
 import sys
 from pathlib import Path
 

@@ -1,0 +1,90 @@
+
+# Sound Pitch Recognition Methods
+
+## Hidden Markov Model (HMM)
+- Probabilistic model for sequential data
+- States: phonemes or pitch levels
+- Transition probabilities between states
+- Emission probabilities for observations
+
+## Progress
+- Interface is completed
+	- sound input
+	- user input
+	- write out sound file
+- Next step
+	- process .wav/ with YIN/ frequency method
+
+### Fourier Transform
+$$X(k) = \sum_{n=0}^{N-1} x(n) e^{-j2\pi kn/N}$$
+
+Where:
+- $x(n)$ = time-domain signal
+- $N$ = number of samples
+- $k$ = frequency bin index
+
+## Feature Extraction
+- MFCC (Mel-Frequency Cepstral Coefficients)
+- Zero-crossing rate
+- Spectral centroid
+
+## Pitch Detection
+- Autocorrelation
+- YIN algorithm
+- Fundamental frequency estimation
+
+## Goal
+sheet music by recognizing notes, durations, and other essential musical elements from audio inputs.
+
+### Key Capabilities
+- Detect pitches (notes) and map them to musical notation (e.g., A4, C#5)
+- Identify and represent rests, chords, and polyphony where possible
+- metadata: key sign, time signature, tempo
+- MusicXML || MIDI
+
+### Scope & Constraints
+- Train by single instrument or a solo vocal. (AI/ML, Acoustic Numerical Physics Aided)
+- Western equal-tempered and 12-tone scale
+- Real-time performance / offline transcription
+
+### Success Benchmark
+- Pitch detection F0 Average Error: ≤ 20 cents
+- Note onset detection F1 score (Fisher Score Based)
+- Correct mapping to notated pitches and durations
+- Output file validates as MusicXML or MIDI file
+
+### Methods
+- SP: STFT, spectral analysis, peak detection
+- MFCC, spectral centroid, and zero-crossing rate for auxiliary features
+- Pitch detection: autocorrelation, YIN, or deep learning-based F0 estimators
+- Segmentation for onsets/offsets: energy envelope, spectral flux, or supervised onset detectors
+- SM: HMM / CRF / RNN / Transformer
+- Chord recognition / polyphony strategies: non-negative matrix factorization
+
+### Data & Evaluation
+- MAPS, MusicNet, maestro? corpora?
+- Evaluate F0 error (cents), onset/offset F1
+- MusicXML/MIDI validation?
+
+### Milestones & Deliverables
+1. MVP
+	- Input: WAV/MP3 -> output: MusicXML or MIDI
+	- Components: STFT + pitch detection + onset detection + quantization rule for note durations
+2. Quantization and reduce pitch error
+	- ML models for onset/pitch refinement; 
+3. melody + harmony
+	- Multi-pitch detection / chord inference
+4. UIUX
+	- record, score editors, export to PDF, batch processing
+
+### Tools & Libraries Recommendations
+- Python libraries: librosa, madmom, essentia, numpy, scipy
+- Deep learning: PyTorch or TensorFlow for neural onset/pitch models
+- music21 for handling MusicXML/MIDI and rendering
+
+### Combine
+- start with MAPS/Maestro/MusicNet and build a small validation set
+- energy/onset detection + YIN pitch estimation + quantization to MusicXML
+- Evaluate and iterate with more advanced models for pitch/onset
+
+> Note: polyphonic transcribing scenarios.

@@ -1,0 +1,3 @@
+/Users/zhuowenfeng6626/Downloads/AI-ML-Project/build/CMakeFiles/note_record.dir
+/Users/zhuowenfeng6626/Downloads/AI-ML-Project/build/CMakeFiles/edit_cache.dir
+/Users/zhuowenfeng6626/Downloads/AI-ML-Project/build/CMakeFiles/rebuild_cache.dir

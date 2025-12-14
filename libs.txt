@@ -1,0 +1,4 @@
+Qt 6.5+ (Widgets, Multimedia, Permissions). Install via Homebrew: `brew install qt`.
+If CMake cannot find Qt, set `CMAKE_PREFIX_PATH=$(brew --prefix qt)/lib/cmake` or set `QT_DIR` to the Qt cmake folder.
+CMake >= 3.14
+clang++ or g++

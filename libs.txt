@@ -2,3 +2,5 @@ Qt 6.5+ (Widgets, Multimedia, Permissions). Install via Homebrew: `brew install 
 If CMake cannot find Qt, set `CMAKE_PREFIX_PATH=$(brew --prefix qt)/lib/cmake` or set `QT_DIR` to the Qt cmake folder.
 CMake >= 3.14
 clang++ or g++
+Windows note: CMake will auto-bootstrap vcpkg (by default) and install `qtbase` + `qtmultimedia` if Qt is missing. Disable with `-DAUTO_INSTALL_QT=OFF` or provide your own `CMAKE_TOOLCHAIN_FILE`.
+Python 3 for running the audio/ML helper scripts (`audio_processor.py`, `ml_model.py`).

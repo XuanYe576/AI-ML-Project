@@ -12,6 +12,8 @@
 #include <QUrl>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QProcess>
+#include <QProcessEnvironment>
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QAudioRecorder>
@@ -31,9 +33,6 @@
 #import <dispatch/dispatch.h>
 #endif
 #endif
-
-#include "audio_processor.h"
-#include "ml_model.h"
 
 class MainWindow : public QMainWindow
 {
@@ -260,6 +259,45 @@ private:
 #endif
     }
 
+    QString pythonExecutable() const
+    {
+        // Prefer python3, fallback to python.
+        const QString envPy = QProcessEnvironment::systemEnvironment().value("PYTHON", "");
+        if (!envPy.isEmpty())
+            return envPy;
+        return (QFile::exists("/usr/bin/python3") || QFile::exists("C:/Python311/python.exe"))
+                   ? QStringLiteral("python3")
+                   : QStringLiteral("python");
+    }
+
+    QString runPythonScript(const QString &scriptName, const QStringList &args) const
+    {
+        QString scriptPath = QDir(QCoreApplication::applicationDirPath()).filePath(scriptName);
+        if (!QFile::exists(scriptPath)) {
+            // Fallback to project root when running from a build tree.
+            scriptPath = QDir(QCoreApplication::applicationDirPath()).filePath("../" + scriptName);
+        }
+        if (!QFile::exists(scriptPath)) {
+            return QString("script not found: %1").arg(scriptName);
+        }
+
+        QProcess proc;
+        proc.setProgram(pythonExecutable());
+        proc.setArguments(QStringList{scriptPath} + args);
+        proc.setWorkingDirectory(QCoreApplication::applicationDirPath());
+        proc.start();
+        if (!proc.waitForFinished(10000)) {
+            proc.kill();
+            return QString("timeout running %1").arg(scriptName);
+        }
+        const QByteArray out = proc.readAllStandardOutput();
+        const QByteArray err = proc.readAllStandardError();
+        if (!err.isEmpty()) {
+            qWarning() << scriptName << "stderr:" << err;
+        }
+        return QString::fromUtf8(out).trimmed();
+    }
+
     void stopRecording()
     {
 #ifdef Q_OS_MAC
@@ -276,8 +314,9 @@ private:
 #endif
         recordAction->setChecked(false);
         if (!lastRecordingPath.isEmpty()) {
-            AudioProcessor::summarizeWav(lastRecordingPath);
-            const QString mlSummary = MachineLearningModel::runInference(lastRecordingPath);
+            const QString summary = runPythonScript("audio_processor.py", {lastRecordingPath});
+            const QString mlSummary = runPythonScript("ml_model.py", {lastRecordingPath});
+            qDebug() << "Audio summary:" << summary;
             qDebug() << "ML summary:" << mlSummary;
         }
         QMessageBox::information(this, "Recording saved", "Audio saved to the output folder.");

@@ -80,11 +80,19 @@ sheet music by recognizing notes, durations, and other essential musical element
 4. UIUX
 	- record, score editors, export to PDF, batch processing
 5. Single note recognization from STFT
-    - trained on STFT of clear audio, with note and instrument identification  
-6. note recognition in audio track
-    - find peaks in where the note most likely is
-    - find probable parameters for transformations of note/sound (time shift, amplitude, pitch change?)
+    - trained on STFT of clear audio with note and instrument identification (train on multiple aligned samples of same note)
+    - one recognition model for each instrument/sound
+    - find probability of model instrument/sound
+    - find probable parameters for transformations of note/sound (amplitude, pitch change (only for sounds))
+5. Multi note recognization
+    - one recognition model for each instrument/sound
+    - trained on chords and stacked notes of one instrument
+    - find probability of model instrument/sound
+    - find probability peaks of amplitudes and pitches for some short time interval
+7. note recognition in audio track
     - trained on STFT of audio track, with instrument and reference midi notes
+    - find peaks in where the note most likely is (multiple passes (for chords) with multiple recognition models (multiinstrument))
+    - find probable parameters for transformations of note/sound (time shift, amplitude, pitch change (only for sounds))
 
 
 ### Tools & Libraries Recommendations

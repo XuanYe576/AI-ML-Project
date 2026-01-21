@@ -1,9 +1,12 @@
 #include <QApplication>
 #include <QMainWindow>
 #include <QTextEdit>
+#include <QPlainTextEdit>
+#include <QDockWidget>
 #include <QToolBar>
 #include <QFileDialog>
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 #include <QDateTime>
 #include <QMessageBox>
@@ -46,12 +49,19 @@ public:
         setCentralWidget(editor);
 
         auto *toolbar = addToolBar("Controls");
-        QAction *openAction = toolbar->addAction("Open");
-        QAction *saveAction = toolbar->addAction("Save As");
+        QAction *openAction = toolbar->addAction("Open Sheet");
+        QAction *saveAction = toolbar->addAction("Save Sheet As");
         toolbar->addSeparator();
 
         recordAction = toolbar->addAction("Record");
         recordAction->setCheckable(true);
+
+        processorCombo = new QComboBox(this);
+        processorCombo->addItem("YIN");
+        processorCombo->addItem("APBP");
+        toolbar->addWidget(processorCombo);
+
+        QAction *processAction = toolbar->addAction("Run");
 
         formatCombo = new QComboBox(this);
         formatCombo->addItem("wav");
@@ -61,6 +71,14 @@ public:
         connect(openAction, &QAction::triggered, this, &MainWindow::openFile);
         connect(saveAction, &QAction::triggered, this, &MainWindow::saveFileAs);
         connect(recordAction, &QAction::toggled, this, &MainWindow::toggleRecording);
+        connect(processAction, &QAction::triggered, this, &MainWindow::runProcessing);
+
+        pitchLog = new QPlainTextEdit(this);
+        pitchLog->setReadOnly(true);
+        pitchLog->setPlaceholderText("Processor output will appear here.");
+        auto *dock = new QDockWidget("Processor Output", this);
+        dock->setWidget(pitchLog);
+        addDockWidget(Qt::BottomDockWidgetArea, dock);
 
         // Ensure the output directory exists ahead of time.
         outputDir = QDir(QCoreApplication::applicationDirPath()).filePath("output");
@@ -79,12 +97,23 @@ public:
 #endif
     }
 
+    ~MainWindow() override
+    {
+        if (yinProcess) {
+            yinProcess->kill();
+            yinProcess->waitForFinished(1000);
+        }
+    }
+
 private:
     QTextEdit *editor{};
     QAction *recordAction{};
+    QComboBox *processorCombo{};
     QComboBox *formatCombo{};
     QString outputDir;
     QString lastRecordingPath;
+    QPlainTextEdit *pitchLog{};
+    QProcess *yinProcess{};
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     QAudioRecorder *audioRecorder{};
@@ -100,7 +129,7 @@ private:
     void openFile()
     {
         const QString fileName = QFileDialog::getOpenFileName(
-            this, "Open text file", QString(), "Text Files (*.musicxml *.mxl *.mid *.xml *.txt *.md);;All Files (*)");
+            this, "Open music sheet", QString(), "Text Files (*.musicxml *.mxl *.mid *.xml *.txt *.md);;All Files (*)");
         if (fileName.isEmpty())
             return;
 
@@ -115,7 +144,7 @@ private:
     void saveFileAs()
     {
         const QString fileName = QFileDialog::getSaveFileName(
-            this, "Save text file", QString(), "Text Files (*.musicxml *.mxl *.mid *.xml *.txt *.md);;All Files (*)");
+            this, "Save music sheet", QString(), "Text Files (*.musicxml *.mxl *.mid *.xml *.txt *.md);;All Files (*)");
         if (fileName.isEmpty())
             return;
 
@@ -270,14 +299,35 @@ private:
                    : QStringLiteral("python");
     }
 
+    QString resolveScriptPath(const QString &scriptName) const
+    {
+        const QStringList candidates = {
+            QDir(QCoreApplication::applicationDirPath()).filePath(scriptName),
+            QDir(QCoreApplication::applicationDirPath()).filePath(scriptName + ".py"),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../" + scriptName),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../" + scriptName + ".py"),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../../" + scriptName),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../../" + scriptName + ".py"),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../../../" + scriptName),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../../../" + scriptName + ".py"),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../../../../" + scriptName),
+            QDir(QCoreApplication::applicationDirPath()).filePath("../../../../" + scriptName + ".py"),
+            QDir::current().filePath(scriptName),
+            QDir::current().filePath(scriptName + ".py"),
+        };
+
+        for (const auto &cand : candidates) {
+            if (QFile::exists(cand)) {
+                return QDir(cand).canonicalPath().isEmpty() ? cand : QDir(cand).canonicalPath();
+            }
+        }
+        return {};
+    }
+
     QString runPythonScript(const QString &scriptName, const QStringList &args) const
     {
-        QString scriptPath = QDir(QCoreApplication::applicationDirPath()).filePath(scriptName);
-        if (!QFile::exists(scriptPath)) {
-            // Fallback to project root when running from a build tree.
-            scriptPath = QDir(QCoreApplication::applicationDirPath()).filePath("../" + scriptName);
-        }
-        if (!QFile::exists(scriptPath)) {
+        QString scriptPath = resolveScriptPath(scriptName);
+        if (scriptPath.isEmpty()) {
             return QString("script not found: %1").arg(scriptName);
         }
 
@@ -320,6 +370,86 @@ private:
             qDebug() << "ML summary:" << mlSummary;
         }
         QMessageBox::information(this, "Recording saved", "Audio saved to the output folder.");
+    }
+
+    void runProcessing()
+    {
+        const QString processor = processorCombo ? processorCombo->currentText() : QStringLiteral("YIN");
+        const bool useYin = (processor.compare("YIN", Qt::CaseInsensitive) == 0);
+        const QString scriptName = useYin ? QStringLiteral("YINdetection") : QStringLiteral("audio_processor.py");
+
+        QString scriptPath = resolveScriptPath(scriptName);
+        if (scriptPath.isEmpty()) {
+            QMessageBox::warning(this, "Processing", QString("Could not locate %1 script.").arg(scriptName));
+            return;
+        }
+
+        const QString defaultDir = lastRecordingPath.isEmpty() ? QString() : QFileInfo(lastRecordingPath).absolutePath();
+        const QString filePath = QFileDialog::getOpenFileName(
+            this,
+            "Select audio to process",
+            defaultDir,
+            "Audio Files (*.wav *.m4a *.mp3 *.flac);;All Files (*)");
+        if (filePath.isEmpty())
+            return;
+
+        if (yinProcess) {
+            yinProcess->kill();
+            yinProcess->deleteLater();
+            yinProcess = nullptr;
+        }
+
+        if (!pitchLog)
+            return;
+        pitchLog->clear();
+        pitchLog->appendPlainText(QString("Running %1 on: %2").arg(processor, filePath));
+
+        if (!useYin) {
+            const QString output = runPythonScript(scriptName, {filePath});
+            if (output.isEmpty()) {
+                pitchLog->appendPlainText("Processor returned no output.");
+            } else {
+                pitchLog->appendPlainText(output);
+            }
+            return;
+        }
+
+        yinProcess = new QProcess(this);
+
+        connect(yinProcess, &QProcess::readyReadStandardOutput, this, [this]() {
+            if (!pitchLog || !yinProcess)
+                return;
+            const QString chunk = QString::fromUtf8(yinProcess->readAllStandardOutput());
+            const auto lines = chunk.split('\n', Qt::SkipEmptyParts);
+            for (const auto &line : lines) {
+                pitchLog->appendPlainText(line.trimmed());
+            }
+        });
+        connect(yinProcess, &QProcess::readyReadStandardError, this, [this]() {
+            if (!yinProcess)
+                return;
+            const QByteArray err = yinProcess->readAllStandardError();
+            qWarning() << "Processor stderr:" << err;
+            if (pitchLog) {
+                pitchLog->appendPlainText(QString::fromUtf8(err).trimmed());
+            }
+        });
+        connect(yinProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+                this, [this](int code, QProcess::ExitStatus) {
+                    if (pitchLog) {
+                        pitchLog->appendPlainText(QString("Processor finished (code %1).").arg(code));
+                    }
+                });
+
+        yinProcess->setProgram(pythonExecutable());
+        yinProcess->setArguments({scriptPath, "--audio", filePath, "--stream"});
+        yinProcess->setWorkingDirectory(QCoreApplication::applicationDirPath());
+        yinProcess->start();
+        if (!yinProcess->waitForStarted(3000)) {
+            QMessageBox::warning(this, "Processing", "Failed to start.");
+            yinProcess->deleteLater();
+            yinProcess = nullptr;
+        }
     }
 };
 

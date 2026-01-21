@@ -132,6 +132,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ### Third-party licenses
-- Qt: LGPLv3/GPLv3/Commercial (verify your chosen Qt package and deployment model).
+- Qt: LGPLv3/GPLv3/Commercial
 - Python libraries (e.g., librosa, numpy, scipy, music21, PyTorch/TensorFlow): see their respective licenses.
 - MusicXML schema: © MakeMusic, Inc.; see MusicXML license for details.
+
+
+Winter:   Complete course Math/Physiks
+Readings: Introduction to Radar System
+		  Foundations of Astrophysics
+		  Calculus by Tom M Apostol
+
+Spring:   APh & other STEM courses

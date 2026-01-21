@@ -1,0 +1,210 @@
+from __future__ import annotations
+
+import argparse
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import numpy as np
+
+
+def load_audio(path: Path):
+    """
+    Load audio as mono; prefers librosa (handles wav/m4a), falls back to scipy for wav-only.
+    """
+    try:
+        import librosa  # type: ignore
+    except ImportError:
+        try:
+            from scipy.io import wavfile
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("Install librosa or scipy to load audio.") from exc
+
+        if path.suffix.lower() != ".wav":
+            raise RuntimeError("librosa is not installed and non-wav files are unsupported.")
+        sr, data = wavfile.read(path)
+        audio = data.astype(np.float32)
+        if audio.ndim > 1:
+            audio = audio.mean(axis=1)
+        return audio, sr
+
+    audio, sr = librosa.load(path, sr=None, mono=True)
+    return audio, sr
+
+
+def visualize_results(audio, sample_rate, yin_results, max_print: int = 8, stream: bool = False):
+    if stream:
+        return
+    print(f"Loaded {len(audio)} samples at {sample_rate} Hz")
+    if not yin_results:
+        print("No YIN results to display.")
+        return
+    preview = [f"{p:.2f}" for p in yin_results[:max_print]]
+    print(f"First {min(max_print, len(yin_results))} pitch estimates (Hz): {preview}")
+
+
+def ACF(f, W, t, lag):
+    return np.sum(f[:W] * f[lag + t: lag + t + W])
+
+
+def yin_pitch_estimation(audio, sample_rate, frame_size=2048, hop_size=512,
+                         f0_min=50, f0_max=500, threshold=0.1, on_pitch=None):
+    if len(audio) < frame_size:
+        return []
+
+    num_frames = 1 + (len(audio) - frame_size) // hop_size
+    yin_results = []
+    max_lag = max(1, sample_rate // max(f0_min, 1))
+    min_lag = max(1, sample_rate // max(f0_max, 1))
+
+    for i in range(num_frames):
+        start = i * hop_size
+        frame = audio[start:start + frame_size]
+
+        W = frame_size
+        t = 0
+
+        # Step 1: Calculate the difference function
+        d = np.zeros(max_lag)
+        for lag in range(1, max_lag):
+            d[lag] = ACF(frame, W, t, lag)
+
+        # Step 2: Cumulative mean normalized difference function
+        cmndf = np.zeros(max_lag)
+        cmndf[0] = 1.0
+        running_sum = 0.0
+        for lag in range(1, max_lag):
+            running_sum += d[lag]
+            cmndf[lag] = d[lag] * lag / running_sum if running_sum != 0 else 1.0
+
+        # Step 3: Absolute threshold
+        tau = min_lag
+        while tau < max_lag:
+            if cmndf[tau] < threshold:
+                break
+            tau += 1
+
+        pitch = 0.0 if tau >= max_lag or tau <= 0 else float(sample_rate) / float(tau)
+        yin_results.append(pitch)
+        if on_pitch is not None:
+            on_pitch(i, pitch)
+
+    return yin_results
+
+
+def _extract_audio_from_xml(xml_path: Path) -> Path | None:
+    """
+    Best-effort: look for <audio>/<sound>/<file>/<path> tags or attributes that point to audio.
+    """
+    try:
+        root = ET.parse(xml_path).getroot()
+    except (ET.ParseError, FileNotFoundError):
+        return None
+
+    candidates: list[str] = []
+    for tag in ("audio", "sound", "media", "file", "path"):
+        for node in root.iter(tag):
+            for attr in ("path", "href", "file", "name"):
+                val = node.attrib.get(attr)
+                if val:
+                    candidates.append(val)
+            if node.text and node.text.strip():
+                candidates.append(node.text.strip())
+
+    for cand in candidates:
+        candidate_path = Path(cand)
+        if not candidate_path.is_absolute():
+            candidate_path = (xml_path.parent / candidate_path).resolve()
+        if candidate_path.exists():
+            return candidate_path
+    return None
+
+
+def _interactive_audio_choice(search_root: Path | suggestions) -> Path | None:
+    suggestions: list[Path] = []
+    for root in [search_root, Path("Training") if search_root is None else None]:
+        if root and root.exists():
+            suggestions.extend(sorted(root.glob("**/*.m4a")))
+            suggestions.extend(sorted(root.glob("**/*.wav")))
+            if suggestions:
+                break
+
+    if suggestions:
+        print("Select an audio file:")
+        for idx, path in enumerate(suggestions, 1):
+            print(f"{idx}. {path}")
+        choice = input("Enter number or a custom path: ").strip()
+        if choice.isdigit():
+            sel = int(choice)
+            if 1 <= sel <= len(suggestions):
+                return suggestions[sel - 1]
+        if choice:
+            return Path(choice).expanduser()
+    else:
+        resp = input("Enter path to audio file (.wav/.m4a): ").strip()
+        if resp:
+            return Path(resp).expanduser()
+    return None
+
+
+def choose_audio_path(audio_arg: Path | None, xml_arg: Path | None) -> Path | None:
+    if audio_arg:
+        return audio_arg
+    if xml_arg:
+        resolved = _extract_audio_from_xml(xml_arg)
+        if resolved:
+            print(f"Using audio from XML: {resolved}")
+            return resolved
+        print("No audio path found in XML; falling back to manual selection.")
+    return _interactive_audio_choice()
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run YIN pitch estimation.")
+    parser.add_argument("--audio", type=Path, help="Path to audio file (.wav/.m4a).")
+    parser.add_argument("--xml", type=Path, help="XML/MusicXML file containing or referencing the audio file.")
+    parser.add_argument("--frame-size", type=int, default=2048, help="Frame size for YIN.")
+    parser.add_argument("--hop-size", type=int, default=512, help="Hop size for YIN.")
+    parser.add_argument("--f0-min", type=int, default=50, help="Minimum expected fundamental frequency (Hz).")
+    parser.add_argument("--f0-max", type=int, default=500, help="Maximum expected fundamental frequency (Hz).")
+    parser.add_argument("--threshold", type=float, default=0.1, help="YIN threshold.")
+    parser.add_argument("--stream", action="store_true", help="Stream pitch estimates to stdout as they are computed.")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    file_path = choose_audio_path(args.audio, args.xml)
+    if not file_path:
+        print("No audio file selected.")
+        return 1
+    if not file_path.exists():
+        print(f"Audio file not found: {file_path}")
+        return 1
+
+    try:
+        audio, sr = load_audio(file_path)
+    except Exception as exc:
+        print(f"Failed to load audio: {exc}", file=sys.stderr)
+        return 2
+
+    def stream_printer(idx: int, pitch: float):
+        print(f"frame {idx}: {pitch:.2f} Hz")
+        sys.stdout.flush()
+
+    yin_results = yin_pitch_estimation(
+        audio,
+        sr,
+        frame_size=args.frame_size,
+        hop_size=args.hop_size,
+        f0_min=args.f0_min,
+        f0_max=args.f0_max,
+        threshold=args.threshold,
+        on_pitch=stream_printer if args.stream else None,
+    )
+    visualize_results(audio, sr, yin_results, stream=args.stream)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

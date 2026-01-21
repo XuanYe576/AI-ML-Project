@@ -1,0 +1,76 @@
+import trimesh
+import numpy as np
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import pygame
+from pygame.locals import *
+
+def load_stl(filepath):
+    """Load an STL file"""
+    return trimesh.load(filepath)
+
+def setup_opengl(width, height):
+    """Initialize OpenGL settings"""
+    glEnable(GL_DEPTH_TEST)
+    glEnable(GL_LIGHTING)
+    glEnable(GL_LIGHT0)
+    glEnable(GL_COLOR_MATERIAL)
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+    
+    glMatrixMode(GL_PROJECTION)
+    gluPerspective(45, (width / height), 0.1, 50.0)
+    glMatrixMode(GL_MODELVIEW)
+
+def render_mesh(mesh):
+    """Render a trimesh object"""
+    glBegin(GL_TRIANGLES)
+    for face in mesh.faces:
+        for vertex_idx in face:
+            glVertex3fv(mesh.vertices[vertex_idx])
+    glEnd()
+
+def main():
+    pygame.init()
+    display = (1200, 800)
+    pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+    pygame.display.set_caption("STL Viewer")
+    
+    clock = pygame.time.Clock()
+    mesh = load_stl("model.stl")  # Change to your STL file path
+    
+    setup_opengl(display[0], display[1])
+    
+    rotation = [0, 0]
+    
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            rotation[1] += 2
+        if keys[pygame.K_RIGHT]:
+            rotation[1] -= 2
+        if keys[pygame.K_UP]:
+            rotation[0] += 2
+        if keys[pygame.K_DOWN]:
+            rotation[0] -= 2
+        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glLoadIdentity()
+        glTranslatef(0, 0, -5)
+        glRotatef(rotation[0], 1, 0, 0)
+        glRotatef(rotation[1], 0, 1, 0)
+        
+        glColor3f(0.7, 0.7, 0.9)
+        render_mesh(mesh)
+        
+        pygame.display.flip()
+        clock.tick(60)
+    
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()

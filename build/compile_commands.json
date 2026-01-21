@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/zhuowenfeng6626/Downloads/AI-ML-Project/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/clang++ -DQT_CORE_LIB -DQT_DISABLE_DEPRECATED_BEFORE=0x050F00 -DQT_GUI_LIB -DQT_MULTIMEDIA_LIB -DQT_NETWORK_LIB -DQT_WIDGETS_LIB -isystem /opt/homebrew/opt/qtbase/lib/QtWidgets.framework/Headers -iframework /opt/homebrew/opt/qtbase/lib -isystem /opt/homebrew/opt/qtbase/lib/QtCore.framework/Headers -isystem /opt/homebrew/opt/qtbase/share/qt/mkspecs/macx-clang -isystem /opt/homebrew/opt/qtbase/include -isystem /opt/homebrew/opt/qtbase/lib/QtGui.framework/Headers -isystem /opt/homebrew/opt/qtmultimedia/lib/QtMultimedia.framework/Headers -iframework /opt/homebrew/opt/qtmultimedia/lib -isystem /opt/homebrew/opt/qtbase/lib/QtNetwork.framework/Headers -x objective-c++ -g -std=gnu++17 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -o CMakeFiles/note_record.dir/main.cpp.o -c /Users/zhuowenfeng6626/Downloads/AI-ML-Project/main.cpp",
+  "file": "/Users/zhuowenfeng6626/Downloads/AI-ML-Project/main.cpp",
+  "output": "CMakeFiles/note_record.dir/main.cpp.o"
+}
+]
